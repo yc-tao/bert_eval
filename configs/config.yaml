@@ -1,0 +1,15 @@
+defaults:
+  - data: default
+  - model: clinical_bert
+  - training: default
+  - _self_
+  - override hydra/job_logging: rich
+
+# Experiment configuration
+experiment_name: "clinical_bert_readmission"
+
+hydra:
+  job:
+    name: clinical_bert_readmission
+  run:
+    dir: ./outputs/${hydra:job.name}/${now:%Y-%m-%d_%H-%M-%S}

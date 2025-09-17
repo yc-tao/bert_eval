@@ -1,0 +1,5 @@
+# Alternative model configuration
+model_name: "emilyalsentzer/Bio_ClinicalBERT"
+model_cache_dir: "/ssd-shared/yichen_models"
+max_length: 512
+num_labels: 2

@@ -1,0 +1,4 @@
+# Data configuration
+data_path: "/ssd-shared/yichen_data/mimic_iv_readmission_tuning.json"
+test_size: 0.2
+random_state: 42
