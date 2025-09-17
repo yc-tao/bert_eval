@@ -8,6 +8,10 @@ defaults:
 # Experiment configuration
 experiment_name: "clinical_bert_readmission"
 
+# GPU configuration
+tensor_parallelism: 4
+cuda_visible_devices: "0,1,4,7"
+
 hydra:
   job:
     name: clinical_bert_readmission

@@ -1,0 +1,23 @@
+# Configuration for evaluating a locally fine-tuned model
+
+# Model settings - specify path to your fine-tuned model
+model_path: "/ssd-shared/yichen_models/clinical_bert_readmission"
+cache_dir: "/ssd-shared/yichen_models"
+
+# Data settings
+data_path: "/ssd-shared/yichen_data/mimic_iv_readmission_tuning.json"
+no_labels: false
+
+# Evaluation parameters (should match training settings)
+max_length: 256
+batch_size: 32
+
+# Output settings
+output_dir: "./evaluation_results/pretrained_model"
+generate_report: true
+
+# Disable model comparison for single model evaluation
+compare_models: null
+
+# Visualization settings
+generate_plots: true

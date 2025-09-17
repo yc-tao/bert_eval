@@ -1,0 +1,21 @@
+# Configuration for inference on data without labels
+
+# Model settings
+model_path: "/ssd-shared/yichen_models/clinical_bert_readmission"
+cache_dir: "/ssd-shared/yichen_models"
+
+# Data settings - for unlabeled data
+data_path: "/path/to/unlabeled_data.json"  # Update with your data path
+no_labels: true  # Important: set to true for inference
+
+# Evaluation parameters
+max_length: 256
+batch_size: 32
+
+# Output settings
+output_dir: "./evaluation_results/inference"
+generate_report: false  # No report for inference without labels
+
+# Disable comparison and plots for inference
+compare_models: null
+generate_plots: false

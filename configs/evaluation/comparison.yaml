@@ -1,0 +1,25 @@
+# Configuration for comparing multiple models
+
+# Primary model
+model_path: "medicalai/ClinicalBERT"
+cache_dir: "/ssd-shared/yichen_models"
+
+# Data settings
+data_path: "/ssd-shared/yichen_data/mimic_iv_readmission_tuning.json"
+no_labels: false
+
+# Additional models to compare
+compare_models:
+  - "emilyalsentzer/Bio_ClinicalBERT"
+  - "/ssd-shared/yichen_models/clinical_bert_readmission"  # Your fine-tuned model
+
+# Evaluation parameters
+max_length: 256
+batch_size: 32
+
+# Output settings
+output_dir: "./evaluation_results/model_comparison"
+generate_report: true
+
+# Visualization settings
+generate_plots: true

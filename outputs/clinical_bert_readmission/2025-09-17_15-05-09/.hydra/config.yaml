@@ -1,0 +1,31 @@
+data:
+  data_path: /ssd-shared/yichen_data/mimic_iv_readmission_tuning.json
+  test_size: 0.2
+  random_state: 42
+model:
+  model_name: medicalai/ClinicalBERT
+  model_cache_dir: /ssd-shared/yichen_models
+  max_length: 256
+  num_labels: 2
+training:
+  output_dir: /ssd-shared/yichen_models/clinical_bert_readmission
+  train_batch_size: 16
+  eval_batch_size: 32
+  learning_rate: 2.0e-05
+  num_train_epochs: 3
+  warmup_steps: 500
+  weight_decay: 0.01
+  fp16: true
+  dataloader_num_workers: 4
+  save_strategy: epoch
+  eval_strategy: epoch
+  load_best_model_at_end: true
+  metric_for_best_model: eval_f1
+  early_stopping_patience: 2
+  logging_steps: 100
+  save_total_limit: 3
+  greater_is_better: true
+  report_to: null
+experiment_name: clinical_bert_readmission
+tensor_parallelism: 4
+cuda_visible_devices: 0,1,4,7

@@ -1,0 +1,23 @@
+# Default evaluation configuration
+
+# Model settings
+model_path: "medicalai/ClinicalBERT"  # Can be HuggingFace model name or local path
+cache_dir: "/ssd-shared/yichen_models"
+
+# Data settings
+data_path: "/ssd-shared/yichen_data/mimic_iv_readmission_tuning.json"
+no_labels: false  # Set to true if data doesn't have labels (inference only)
+
+# Evaluation parameters
+max_length: 256
+batch_size: 32
+
+# Output settings
+output_dir: "./evaluation_results"
+generate_report: true
+
+# Optional: Compare multiple models
+compare_models: null  # List of additional models to compare
+
+# Visualization settings
+generate_plots: true
