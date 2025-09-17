@@ -22,6 +22,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from src.evaluation.evaluator import ClinicalBERTEvaluator
+from src.utils.device_manager import setup_devices_from_config
 
 # Setup logging
 logging.basicConfig(
@@ -114,8 +115,11 @@ def main_with_hydra(cfg: DictConfig) -> None:
     logger.info("Starting ClinicalBERT model evaluation")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(cfg)}")
 
+    # Setup CUDA devices if specified
+    device_manager = setup_devices_from_config(cfg) if hasattr(cfg, 'cuda_visible_devices') else None
+
     # Initialize evaluator
-    evaluator = ClinicalBERTEvaluator(cache_dir=cfg.cache_dir)
+    evaluator = ClinicalBERTEvaluator(cache_dir=cfg.cache_dir, device_manager=device_manager)
 
     # Run evaluation
     try:

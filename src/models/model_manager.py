@@ -24,7 +24,7 @@ class ModelManager:
         Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
     def load_model_and_tokenizer(self, model_name: str, num_labels: int = 2,
-                                use_fast_tokenizer: bool = True) -> Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
+                                use_fast_tokenizer: bool = True, device: str = None) -> Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
         """
         Load model and tokenizer from HuggingFace or local path
 
@@ -32,6 +32,7 @@ class ModelManager:
             model_name: Model name or path
             num_labels: Number of classification labels
             use_fast_tokenizer: Whether to use fast tokenizer
+            device: Device to load model on (auto-detected if None)
 
         Returns:
             Tuple of (model, tokenizer)
@@ -55,6 +56,14 @@ class ModelManager:
             logger.info(f"Successfully loaded {model_name}")
             if hasattr(model.config, 'max_position_embeddings'):
                 logger.info(f"Model max position embeddings: {model.config.max_position_embeddings}")
+
+            # Move model to specified device
+            if device is None:
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+
+            if torch.cuda.is_available() and device.startswith("cuda"):
+                model = model.to(device)
+                logger.info(f"Model moved to device: {device}")
 
             return model, tokenizer
 
@@ -163,13 +172,14 @@ class ModelManager:
             "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext"
         ]
 
-    def load_with_fallback(self, primary_model: str, num_labels: int = 2) -> Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
+    def load_with_fallback(self, primary_model: str, num_labels: int = 2, device: str = None) -> Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
         """
         Load model with fallback options
 
         Args:
             primary_model: Primary model to try
             num_labels: Number of classification labels
+            device: Device to load model on
 
         Returns:
             Tuple of (model, tokenizer)
@@ -179,7 +189,7 @@ class ModelManager:
         for model_name in models_to_try:
             try:
                 logger.info(f"Attempting to load {model_name}")
-                return self.load_model_and_tokenizer(model_name, num_labels)
+                return self.load_model_and_tokenizer(model_name, num_labels, device=device)
             except Exception as e:
                 logger.warning(f"Failed to load {model_name}: {e}")
                 continue

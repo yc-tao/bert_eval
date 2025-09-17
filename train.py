@@ -31,6 +31,7 @@ from src.data.dataset import ReadmissionDataset
 from src.models.model_manager import ModelManager
 from src.training.trainer import WeightedTrainer, compute_class_weights, setup_training_args
 from src.evaluation.metrics import compute_metrics
+from src.utils.device_manager import setup_devices_from_config
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,9 @@ logger = logging.getLogger(__name__)
 def main(cfg: DictConfig) -> None:
     logger.info("Starting ClinicalBERT fine-tuning for readmission prediction")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(cfg)}")
+
+    # Setup CUDA devices from configuration
+    device_manager = setup_devices_from_config(cfg)
 
     # Load and preprocess data
     texts, labels = load_and_preprocess_data(cfg.data.data_path)
@@ -79,8 +83,8 @@ def main(cfg: DictConfig) -> None:
     class_weights = compute_class_weights(train_labels)
     logger.info(f"Class weights: {class_weights}")
 
-    # Setup training arguments
-    training_args = setup_training_args(cfg.training, cfg.training.output_dir)
+    # Setup training arguments with device manager
+    training_args = setup_training_args(cfg.training, cfg.training.output_dir, device_manager)
 
     # Setup trainer
     trainer = WeightedTrainer(
@@ -90,6 +94,7 @@ def main(cfg: DictConfig) -> None:
         eval_dataset=val_dataset,
         compute_metrics=compute_metrics,
         class_weights=class_weights,
+        device_manager=device_manager,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=cfg.training.early_stopping_patience)]
     )
 

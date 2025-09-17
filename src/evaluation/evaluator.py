@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 import numpy as np
+import torch
 
 try:
     import matplotlib.pyplot as plt
@@ -20,6 +21,7 @@ from ..models.model_manager import ModelManager
 from ..data.loader import load_evaluation_data, get_data_statistics
 from ..data.dataset import EvaluationDataset
 from .metrics import ModelEvaluator
+from ..utils.device_manager import DeviceManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +29,9 @@ logger = logging.getLogger(__name__)
 class ClinicalBERTEvaluator:
     """Main orchestrator for evaluating ClinicalBERT models"""
 
-    def __init__(self, cache_dir: str = "/ssd-shared/yichen_models"):
+    def __init__(self, cache_dir: str = "/ssd-shared/yichen_models", device_manager: DeviceManager = None):
         self.model_manager = ModelManager(cache_dir)
+        self.device_manager = device_manager or DeviceManager()
         self.results = {}
 
     def evaluate_model(self, model_path: str, data_path: str,
@@ -55,10 +58,16 @@ class ClinicalBERTEvaluator:
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-        # Load model and tokenizer
+        # Load model and tokenizer with device management
         try:
-            model, tokenizer = self.model_manager.setup_model_for_evaluation(model_path)
+            # Determine device for evaluation
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model, tokenizer = self.model_manager.setup_model_for_evaluation(model_path, device=device)
             logger.info("Model loaded successfully")
+
+            # Log device information
+            if self.device_manager:
+                self.device_manager.log_device_setup()
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise

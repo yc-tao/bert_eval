@@ -208,6 +208,12 @@ def main(cfg: DictConfig) -> None:
     logger.info("Starting ClinicalBERT fine-tuning for readmission prediction")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(cfg)}")
 
+    # Setup CUDA devices from configuration
+    if hasattr(cfg, 'cuda_visible_devices') and cfg.cuda_visible_devices:
+        import os
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.cuda_visible_devices)
+        logger.info(f"Set CUDA_VISIBLE_DEVICES={cfg.cuda_visible_devices}")
+
     # Load and preprocess data
     texts, labels = load_and_preprocess_data(cfg)
 
