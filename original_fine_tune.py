@@ -23,7 +23,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score, classification_report, average_precision_score
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 
 import transformers
@@ -70,7 +70,7 @@ class ReadmissionDataset(Dataset):
         return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
-            'labels': torch.tensor(label, dtype=torch.float)
+            'labels': torch.tensor(label, dtype=torch.long)
         }
 
 
@@ -93,17 +93,7 @@ def load_and_preprocess_data(cfg: DictConfig) -> Tuple[List[str], List[int]]:
     labels = [item['label'] for item in data]
 
     logger.info(f"Loaded {len(data)} samples")
-
-    label_counts = np.bincount(labels)
-    negative_cases = label_counts[0] if len(label_counts) > 0 else 0
-    positive_cases = label_counts[1] if len(label_counts) > 1 else 0
-    prevalence = positive_cases / len(labels) if len(labels) > 0 else 0
-
-    logger.info(f"Label distribution: {label_counts}")
-    logger.info(f"Negative cases (label=0): {negative_cases}")
-    logger.info(f"Positive cases (label=1): {positive_cases}")
-    logger.info(f"Data prevalence (positive/total): {prevalence:.4f} ({positive_cases}/{len(labels)})")
-    logger.info(f"Class ratio (positive:negative): 1:{negative_cases/positive_cases:.2f}" if positive_cases > 0 else "Class ratio: N/A")
+    logger.info(f"Label distribution: {np.bincount(labels)}")
 
     return texts, labels
 
@@ -139,7 +129,7 @@ def setup_model_and_tokenizer(cfg: DictConfig):
 
         logger.info(f"Successfully loaded {cfg.model.model_name}")
         logger.info(f"Model max position embeddings: {model.config.max_position_embeddings}")
-
+        
         return model, tokenizer
 
     except Exception as e:
@@ -164,41 +154,30 @@ def setup_model_and_tokenizer(cfg: DictConfig):
 
 
 def compute_metrics(eval_pred):
-    """Compute evaluation metrics for binary classification with single output"""
-    logits, labels = eval_pred
+    """Compute evaluation metrics for the trainer"""
+    predictions, labels = eval_pred
+    predictions = np.argmax(predictions, axis=1)
 
-    # Apply sigmoid to get probabilities
-    probabilities = torch.sigmoid(torch.tensor(logits)).numpy().flatten()
-
-    # Use 0.5 threshold for binary predictions
-    predictions = (probabilities > 0.5).astype(int)
-
-    # Convert labels to int for classification metrics
-    labels = labels.astype(int)
-
-    # Compute metrics
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='binary')
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average='weighted')
     accuracy = accuracy_score(labels, predictions)
 
     try:
-        # AUROC
-        auroc = roc_auc_score(labels, probabilities)
+        # For binary classification, we can compute AUC
+        if len(np.unique(labels)) == 2:
+            # Get probabilities for positive class
+            prob_predictions = torch.softmax(torch.tensor(eval_pred[0]), dim=1)[:, 1].numpy()
+            auc = roc_auc_score(labels, prob_predictions)
+        else:
+            auc = 0.0
     except:
-        auroc = 0.0
-
-    try:
-        # AUPRC (Average Precision)
-        auprc = average_precision_score(labels, probabilities)
-    except:
-        auprc = 0.0
+        auc = 0.0
 
     return {
         'accuracy': accuracy,
         'f1': f1,
         'precision': precision,
         'recall': recall,
-        'auroc': auroc,
-        'auprc': auprc
+        'auc': auc
     }
 
 
@@ -215,14 +194,11 @@ class WeightedTrainer(Trainer):
         logits = outputs.get('logits')
 
         if self.class_weights is not None:
-            # For binary classification with class weights, we need to apply weights manually
-            # Convert class weights to pos_weight for BCEWithLogitsLoss
-            pos_weight = self.class_weights[1] / self.class_weights[0] if len(self.class_weights) > 1 else None
-            loss_fct = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-            loss = loss_fct(logits.view(-1), labels.view(-1))
+            # Apply class weights
+            loss_fct = torch.nn.CrossEntropyLoss(weight=self.class_weights)
+            loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
         else:
-            loss_fct = torch.nn.BCEWithLogitsLoss()
-            loss = loss_fct(logits.view(-1), labels.view(-1))
+            loss = outputs.loss
 
         return (loss, outputs) if return_outputs else loss
 
@@ -246,17 +222,6 @@ def main(cfg: DictConfig) -> None:
 
     logger.info(f"Train set: {len(train_texts)} samples")
     logger.info(f"Validation set: {len(val_texts)} samples")
-
-    val_label_counts = np.bincount(val_labels)
-    val_negative_cases = val_label_counts[0] if len(val_label_counts) > 0 else 0
-    val_positive_cases = val_label_counts[1] if len(val_label_counts) > 1 else 0
-    val_prevalence = val_positive_cases / len(val_labels) if len(val_labels) > 0 else 0
-
-    logger.info(f"\nValidation set distribution:")
-    logger.info(f"  Negative cases (label=0): {val_negative_cases}")
-    logger.info(f"  Positive cases (label=1): {val_positive_cases}")
-    logger.info(f"  Data prevalence (positive/total): {val_prevalence:.4f} ({val_positive_cases}/{len(val_labels)})")
-    logger.info(f"  Class ratio (positive:negative): 1:{val_negative_cases/val_positive_cases:.2f}" if val_positive_cases > 0 else "  Class ratio: N/A")
 
     # Setup model and tokenizer
     model, tokenizer = setup_model_and_tokenizer(cfg)
@@ -310,7 +275,9 @@ def main(cfg: DictConfig) -> None:
         class_weights=class_weights,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=cfg.training.early_stopping_patience)]
     )
-
+    
+    print("n_gpu:", trainer.args.n_gpu, "parallel_mode:", trainer.args.parallel_mode)
+# Expect n_gpu > 1 and parallel_mode == ParallelMode.NOT_DISTRIBUTED when DP is active
     # Train the model
     logger.info("Starting training...")
     trainer.train()
@@ -327,20 +294,7 @@ def main(cfg: DictConfig) -> None:
 
     # Detailed evaluation on validation set
     predictions = trainer.predict(val_dataset)
-
-    # Apply sigmoid to get probabilities and use 0.5 threshold
-    probabilities = torch.sigmoid(torch.tensor(predictions.predictions)).numpy().flatten()
-    y_pred = (probabilities > 0.5).astype(int)
-
-    # Prediction statistics
-    pred_counts = np.bincount(y_pred)
-    pred_negative = pred_counts[0] if len(pred_counts) > 0 else 0
-    pred_positive = pred_counts[1] if len(pred_counts) > 1 else 0
-
-    logger.info("\nPrediction Statistics:")
-    logger.info(f"  Predicted Negative (label=0): {pred_negative}")
-    logger.info(f"  Predicted Positive (label=1): {pred_positive}")
-    logger.info(f"  Predicted prevalence: {pred_positive/len(y_pred):.4f} ({pred_positive}/{len(y_pred)})")
+    y_pred = np.argmax(predictions.predictions, axis=1)
 
     logger.info("\nDetailed Classification Report:")
     logger.info(classification_report(val_labels, y_pred, target_names=['No Readmission', 'Readmission']))

@@ -2,4 +2,4 @@
 model_name: "medicalai/ClinicalBERT"
 model_cache_dir: "/ssd-shared/yichen_models"
 max_length: 256
-num_labels: 2
+num_labels: 1
